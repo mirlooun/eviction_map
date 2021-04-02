@@ -5,6 +5,7 @@ public class EvictionMap<K, V> {
 
     private final long duration; // defines the duration of entity expiration time (after what time entity has to be evicted)
     private final HashMap<K, Entity<K, V>> evictionMap = new HashMap<>(); // EvictionMap class "engine"
+    // PriorityQueue object ot keep tracking of existing entities and sort them by their expiration time
     private final PriorityQueue<Entity<K,V>> onCheck = new PriorityQueue<>(Comparator.comparing(x -> x.expirationTime));
 
 
@@ -14,22 +15,15 @@ public class EvictionMap<K, V> {
 
     public void put(K key, V value) {
         checkToEvict();
-        if (evictionMap.containsKey(key)) {
-            if (evictionMap.get(key).value == value) {
-                evictionMap.remove(key);
-            } else {
-                evictionMap.get(key).value = value;
-            }
-        } else {
-            long expirationTime = getCurrentDateTime() + duration;
-            Entity<K, V> entity = new Entity<>(key, value, expirationTime);
-            evictionMap.put(key, entity);
-            onCheck.add(entity);
-        }
+        evictionMap.remove(key);
+
+        long expirationTime = getCurrentDateTime() + duration;
+        Entity<K, V> entity = new Entity<>(key, value, expirationTime);
+        evictionMap.put(key, entity);
+        onCheck.add(entity);
     }
 
     public V get(K key) {
-        checkToEvict();
         var entity = evictionMap.get(key);
         if (entity == null) return null;
         return isExpired(entity) ? null : entity.value;
