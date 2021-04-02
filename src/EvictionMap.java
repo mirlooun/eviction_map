@@ -1,21 +1,22 @@
-import java.util.Date;
-import java.util.HashMap;
+import java.util.*;
 
 
 public class EvictionMap<K, V> {
 
-    private final long duration;
-    private final HashMap<K, Entity<K, V>> evictionMap = new HashMap<>();
+    private final long duration; // defines the duration of entity expiration time (after what time entity has to be evicted)
+    private final HashMap<K, Entity<K, V>> evictionMap = new HashMap<>(); // EvictionMap class "engine"
+    private final PriorityQueue<Entity<K,V>> onCheck = new PriorityQueue<>(Comparator.comparing(x -> x.expirationTime));
+
 
     public EvictionMap(int duration) {
-        this.duration = duration * 1000L;
+        this.duration = duration * 1000L; // in seconds
     }
 
     public void put(K key, V value) {
         checkToEvict();
         if (evictionMap.containsKey(key)) {
             if (evictionMap.get(key).value == value) {
-                evictionMap.get(key).expirationTime = 0;
+                evictionMap.remove(key);
             } else {
                 evictionMap.get(key).value = value;
             }
@@ -23,6 +24,7 @@ public class EvictionMap<K, V> {
             long expirationTime = getCurrentDateTime() + duration;
             Entity<K, V> entity = new Entity<>(key, value, expirationTime);
             evictionMap.put(key, entity);
+            onCheck.add(entity);
         }
     }
 
@@ -42,11 +44,13 @@ public class EvictionMap<K, V> {
     }
 
     private void checkToEvict() {
-        evictionMap.entrySet().removeIf(entity -> isExpired(entity.getValue()));
-    }
+        if (onCheck.size() == 0) return;
+        while(true) {
+            assert onCheck.peek() != null;
+            if (!(onCheck.peek().expirationTime < getCurrentDateTime())) break;
+            evictionMap.remove(Objects.requireNonNull(onCheck.poll()).key);
 
-    public int size(){
-        return evictionMap.size();
+        }
     }
 
     @Override
